@@ -143,6 +143,7 @@ public class SQLQueryBuilder {
         h3cflip = (clusteringParams.get(H3SQL.HEXBIN_POINTMODE) == Boolean.TRUE);
 
     final String expBboxSql = String.format("st_envelope( st_buffer( ST_MakeEnvelope(%f,%f,%f,%f, 4326)::geography, ( 2.5 * edgeLengthM( %d )) )::geometry )", bbox.minLon(), bbox.minLat(), bbox.maxLon(), bbox.maxLat(), h3res);
+    //final String expBboxSql = String.format("ST_MakeEnvelope(%f,%f,%f,%f, 4326)", bbox.minLon(), bbox.minLat(), bbox.maxLon(), bbox.maxLat());
 
         /*clippedGeo - passed bbox is extended by "margin" on service level */                        
     String clippedGeo = ( !event.getClip() ? "geo" : String.format("ST_Intersection(geo,ST_MakeEnvelope(%f,%f,%f,%f,4326) )", bbox.minLon(), bbox.minLat(), bbox.maxLon(), bbox.maxLat() ) ),
