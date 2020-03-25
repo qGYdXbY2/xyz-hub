@@ -36,7 +36,6 @@ import io.vertx.core.impl.ConcurrentHashSet;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -90,8 +89,11 @@ public abstract class RemoteFunctionClient {
    */
   private static Set<RemoteFunctionClient> clientInstances = new ConcurrentHashSet<>();
   private static LongAdder globalMinConnectionSum = new LongAdder();
+  private static LongAdder globalMaxConnectionSum = new LongAdder();
   private static AtomicLong lastSizeAdjustment;
-  AtomicInteger usedConnections = new AtomicInteger(0);
+
+  private final LimitedQueue<FunctionCall> queue = new LimitedQueue<>(0, 0);
+  private final AtomicInteger usedConnections = new AtomicInteger(0);
 
 //  /**
 //   * Sliding average request execution time in seconds.
@@ -101,7 +103,6 @@ public abstract class RemoteFunctionClient {
    * An approximation for the maximum number of requests per second which can be executed based on the performance of the remote function.
    */
   private double rateOfService;
-  private LimitedQueue<FunctionCall> queue = new LimitedQueue<>(0, 0);
 
   RemoteFunctionClient(Connector connectorConfig) {
     if (connectorConfig == null) {
@@ -149,7 +150,8 @@ public abstract class RemoteFunctionClient {
   void destroy() {
     if (connectorConfig != null) {
       clientInstances.remove(this);
-      globalMinConnectionSum.add(getMinConnections());
+      globalMinConnectionSum.add(-getMinConnections());
+      globalMaxConnectionSum.add(-getMaxConnections());
       adjustQueueByteSizes();
     }
   }
@@ -266,8 +268,10 @@ public abstract class RemoteFunctionClient {
             + connectorConfig.id + " vs. old ID: " + this.connectorConfig.id);
 
     final int oldMinConnections = getMinConnections();
+    final int oldMaxConnections = getMaxConnections();
     this.connectorConfig = connectorConfig;
     globalMinConnectionSum.add(getMinConnections() - oldMinConnections);
+    globalMaxConnectionSum.add(getMaxConnections() - oldMaxConnections);
     adjustQueueByteSizes();
   }
 
@@ -326,8 +330,12 @@ public abstract class RemoteFunctionClient {
     return clientInstances.stream().mapToDouble(RemoteFunctionClient::getArrivalRate).sum();
   }
 
+  public static long getGlobalMinConnections() {
+    return globalMinConnectionSum.longValue();
+  }
+
   public static long getGlobalMaxConnections() {
-    return clientInstances.stream().mapToLong(RemoteFunctionClient::getMaxConnections).sum();
+    return globalMaxConnectionSum.longValue();
   }
 
   public static long getGlobalUsedConnections() {
