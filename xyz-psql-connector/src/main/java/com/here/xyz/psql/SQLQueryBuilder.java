@@ -114,13 +114,11 @@ public class SQLQueryBuilder {
         boolean statisticalPropertyProvided = (statisticalProperty != null && statisticalProperty.length() > 0),
                 h3cflip = (clusteringParams.get(H3SQL.HEXBIN_POINTMODE) == Boolean.TRUE);
 
-        final String expBboxSql = String
-                .format("st_envelope( st_buffer( ST_MakeEnvelope(%f,%f,%f,%f, 4326)::geography, ( 2.5 * edgeLengthM( %d )) )::geometry )",
+        final String expBboxSql = String.format("st_envelope( st_buffer( ST_MakeEnvelope(%f,%f,%f,%f, 4326)::geography, ( 2.5 * edgeLengthM( %d )) )::geometry )",
                         bbox.minLon(), bbox.minLat(), bbox.maxLon(), bbox.maxLat(), h3res);
 
         /*clippedGeo - passed bbox is extended by "margin" on service level */
-        String clippedGeo = (!event.getClip() ? "geo" : String
-                .format("ST_Intersection(geo,ST_MakeEnvelope(%f,%f,%f,%f,4326) )", bbox.minLon(), bbox.minLat(), bbox.maxLon(), bbox.maxLat())),
+        String clippedGeo = (!event.getClip() ? "geo" : String.format("ST_Intersection(geo,ST_MakeEnvelope(%f,%f,%f,%f,4326) )", bbox.minLon(), bbox.minLat(), bbox.maxLon(), bbox.maxLat())),
                 fid = (!event.getClip() ? "h3" : String.format("h3 || %f || %f", bbox.minLon(), bbox.minLat())),
                 filterEmptyGeo = (!event.getClip() ? "" : String.format(" and not st_isempty( %s ) ", clippedGeo));
 
@@ -146,20 +144,17 @@ public class SQLQueryBuilder {
         query.append(expBboxSql);
 
         if (!statisticalPropertyProvided) {
-            query.append(new SQLQuery(String.format(H3SQL.h3sqlMid, h3res, "(0.0)::numeric", zLevel, H3SQL.pxSize)));
+            query.append(new SQLQuery(String.format(H3SQL.h3sqlMid, h3res, "(0.0)::numeric" )));
         } else {
             ArrayList<String> jpath = new ArrayList<>();
             jpath.add("properties");
             jpath.addAll(Arrays.asList(statisticalProperty.split("\\.")));
 
-            query.append(new SQLQuery(String.format(H3SQL.h3sqlMid, h3res, "(jsondata#>> ?)::numeric", zLevel, H3SQL.pxSize)));
+            query.append(new SQLQuery(String.format(H3SQL.h3sqlMid, h3res, "(jsondata#>> ?)::numeric")));
             query.addParameter(SQLQuery.createSQLArray(jpath.toArray(new String[]{}), "text", dataSource));
         }
 
-        //query.append(" case st_geometrytype(geo) when 'ST_Point' then geo else st_intersection( geo ," ); query.append( expBboxSql ); query.append(" ) end as geo ");
-        query.append(" case st_geometrytype(geo) when 'ST_Point' then geo else st_closestpoint( geo, geo ) end as refpt ");
-        query.append(" from ${schema}.${table} v where 1 = 1 and geo && ");
-        query.append(expBboxSql);
+        query.append(" from ${schema}.${table} v where 1 = 1 ");
         query.append(" and st_intersects( geo ,");
         query.append(expBboxSql);
         query.append(" ) ");
